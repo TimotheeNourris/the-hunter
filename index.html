@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Hunter</title>
+  <meta name="description" content="The Hunter trouve les achats qui valent vraiment le coup — et explique pourquoi." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#173d33" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="The Hunter" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="skip" href="#app">Aller au contenu</a>
+  <div class="demo-bar" id="data-bar">Prototype — chargement des données…</div>
+  <div class="offline-bar" id="offline-bar" hidden role="status">Hors ligne : vous voyez les données du dernier chargement. Les dates de vérification restent affichées.</div>
+  <div class="install-bar" id="install-bar" hidden>
+    <div class="wrap install-inner">
+      <img src="assets/icon-192.png" alt="" width="36" height="36" />
+      <span><strong>Installer The Hunter</strong> sur cet appareil : ouverture en un geste, utilisable hors ligne.</span>
+      <button class="btn btn-primary btn-sm" type="button" data-install>Installer</button>
+      <button class="icon-btn" type="button" data-install-dismiss aria-label="Plus tard">×</button>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#/" aria-label="The Hunter — accueil">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/><path d="M16 1v7M16 24v7M1 16h7M24 16h7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span>The Hunter</span>
+      </a>
+      <nav class="nav" aria-label="Principale">
+        <a href="#/recherche" data-route="recherche">Rechercher</a>
+        <a href="#/surveillance" data-route="surveillance">Surveillance <span class="count" data-watch-count hidden>0</span></a>
+        <a href="#/methodologie" data-route="methodologie" class="hide-sm">Méthode</a>
+        <a href="#/compte" data-route="compte" class="nav-account" data-account-label>Compte</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div>
+        <strong>The Hunter</strong>
+        <p class="muted small">Les achats qui valent vraiment le coup — et pourquoi.</p>
+      </div>
+      <nav aria-label="Pied de page">
+        <a href="#/methodologie">Méthodologie & transparence</a>
+        <a href="#/legal">Mentions légales</a>
+        <a href="#/legal">Confidentialité & cookies</a>
+        <a href="#/verificateur">Vérificateur de remises</a>
+        <a href="#/verifier">Vérifier un prix vu ailleurs</a>
+        <a href="#/labo">Labo (interne)</a>
+        <a href="#/qualite">Qualité des données (interne)</a>
+      </nav>
+      <p class="muted xsmall">Certains liens sont des liens partenaires, toujours signalés. La rémunération ne modifie jamais le verdict ni l’ordre des offres.</p>
+    </div>
+  </footer>
+
+  <dialog id="out-dialog" class="dialog">
+    <div class="out-body"></div>
+    <div class="dialog-actions"><button class="btn btn-primary" data-close>Compris</button></div>
+  </dialog>
+
+  <script src="js/dataset.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/hunter.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

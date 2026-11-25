@@ -1,0 +1,94 @@
+{
+  "name": "The Hunter — les achats qui valent vraiment le coup",
+  "short_name": "The Hunter",
+  "description": "Savoir si une offre est une vraie bonne affaire, et pourquoi : historique, coût total, remises vérifiées.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./?source=app#/",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1714",
+  "theme_color": "#173d33",
+  "categories": [
+    "shopping",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scanner un code-barres en magasin",
+      "short_name": "Scanner",
+      "url": "./?source=raccourci#/scan",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Vérifier un prix vu en magasin",
+      "short_name": "Vérifier un prix",
+      "url": "./?source=raccourci#/verifier",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Vérificateur de remises",
+      "short_name": "Remises",
+      "url": "./?source=raccourci#/verificateur",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Ma liste de surveillance",
+      "short_name": "Surveillance",
+      "url": "./?source=raccourci#/surveillance",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
