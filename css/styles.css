@@ -618,3 +618,32 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
 .q-issues li { padding: 9px 12px; border-radius: 10px; font-size: .9rem; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--fair); }
 .q-issues li.q-warn { border-left-color: var(--warn); }
 .q-issues a { text-decoration: none; }
+
+/* ---------- Saisie du relevé (interne, v0.20) ---------- */
+.releve .card { margin-top: 14px; }
+.rv-bar { position: sticky; top: 8px; z-index: 5; }
+.rv-bar-top { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; }
+.rv-bar input[type="time"] { margin-left: 6px; }
+.rv-progress { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 10px 0 6px; }
+.rv-progress span { display: block; height: 100%; background: var(--brand); transition: width .2s; }
+.rv-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rv-actions select, .rv-f input, .rv-f select, .rv-bar input { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+.rv-title { font-size: 1.1rem; margin: 0; }
+.rv-lines { display: grid; gap: 10px; margin-top: 10px; }
+.rv-line { display: grid; grid-template-columns: minmax(150px, 1.3fr) repeat(5, minmax(90px, 1fr)); gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; }
+.rv-line.rv-ok { border-left-color: var(--brand); }
+.rv-line.rv-attention { border-left-color: var(--warn); }
+.rv-line.rv-erreur { border-left-color: var(--bad); }
+.rv-merchant { display: flex; flex-direction: column; gap: 4px; align-self: center; }
+.rv-f { display: flex; flex-direction: column; gap: 3px; font-size: .78rem; color: var(--muted); min-width: 0; }
+.rv-f input, .rv-f select { width: 100%; min-width: 0; font-size: .92rem; }
+.rv-url { grid-column: 2 / -1; }
+.rv-status { grid-column: 1 / -1; margin: 0; color: var(--muted); }
+.rv-erreur .rv-status { color: var(--bad); }
+.rv-attention .rv-status { color: var(--warn); }
+@media (max-width: 760px) {
+  .rv-line { grid-template-columns: 1fr 1fr; }
+  .rv-merchant, .rv-url { grid-column: 1 / -1; }
+  .rv-bar { position: static; }
+}
+.rv-actions select { width: auto; flex: 0 1 auto; }

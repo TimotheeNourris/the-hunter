@@ -1423,6 +1423,224 @@
     }
   }
 
+  /* ---------------- relevé quotidien (interne) ---------------- */
+  const RV_KEY = 'thehunter.releve';
+  const RV_URLS = 'thehunter.releve.urls';
+  const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+  let RV = null;        // { name, header, rows, savedAt }
+  let rvApi = false;    // vrai si le serveur local (npm start) sait lire et enregistrer les feuilles
+
+  function viewReleve() {
+    RV = lsGet(RV_KEY, null);
+    return `
+      <section class="wrap section releve">
+        <p class="eyebrow">Interne · relevé quotidien</p>
+        <h1>Saisie du relevé</h1>
+        <p class="lead">Ouvrez chaque page marchand et notez ce que vous voyez. Les saisies sont gardées dans ce navigateur au fil de l’eau ; rien n’est envoyé ailleurs.</p>
+        <p class="muted small">Navigation privée, sans être connecté. Sur une place de marché, le vendeur affiché par défaut. Produit introuvable : laissez le prix vide.</p>
+        <div id="rv-box">${RV ? releveBody() : releveEmpty()}</div>
+      </section>`;
+  }
+
+  function releveEmpty(msg) {
+    return `
+      <div class="card rv-empty">
+        ${msg ? `<p class="notice small">${esc(msg)}</p>` : ''}
+        <p>Aucune feuille ouverte.</p>
+        <p class="muted small">Créez la feuille du jour avec <code>npm run kit -- feuille</code>. Avec <code>npm start</code>, elle s’ouvre ici toute seule ; sinon, choisissez le fichier :</p>
+        <label class="btn btn-ghost">Ouvrir une feuille (.csv)<input type="file" accept=".csv,text/csv" data-rv-file hidden></label>
+      </div>`;
+  }
+
+  const rvPct = (p) => (p.total ? Math.round(((p.saisis + p.rupture) / p.total) * 100) : 0);
+
+  function releveBody() {
+    const R = window.HunterReleve;
+    const p = R.progress(RV.rows);
+    const hour = (String((RV.rows[0] && RV.rows[0].date_collecte) || '').match(/\d{1,2}:\d{2}/) || ['10:00'])[0];
+    const groups = R.group(RV.rows);
+    return `
+      <div class="card rv-bar">
+        <div class="rv-bar-top">
+          <div><strong>${esc(RV.name)}</strong> <span class="muted small">· ${p.total} lignes · ${groups.length} produits</span></div>
+          <label class="small">Heure du relevé <input type="time" value="${esc(hour.padStart(5, '0'))}" data-rv-hour></label>
+        </div>
+        <div class="rv-progress" aria-hidden="true"><span style="width:${rvPct(p)}%"></span></div>
+        <p class="small" data-rv-count>${releveCount(p)}</p>
+        <div class="rv-actions">
+          <select data-rv-filter aria-label="Lignes affichées"><option value="">Toutes les lignes</option><option value="todo">À faire</option><option value="pb">Erreurs et avertissements</option></select>
+          <button class="btn btn-primary btn-sm" data-rv-save>${rvApi ? 'Enregistrer dans le projet' : 'Télécharger la feuille remplie'}</button>
+          <button class="btn btn-ghost btn-sm" data-rv-download ${rvApi ? '' : 'hidden'}>Télécharger</button>
+          <button class="btn btn-ghost btn-sm" data-rv-close>Fermer la feuille</button>
+        </div>
+        <p class="small" data-rv-msg role="status"></p>
+      </div>
+      ${groups.map((g) => `
+        <div class="card rv-product">
+          <h2 class="rv-title">${esc(g.marque)} ${esc(g.produit)}${g.variante ? ` <span class="muted">· ${esc(g.variante)}</span>` : ''}</h2>
+          <p class="muted xsmall">EAN <code>${esc(g.ean)}</code>${g.mpn ? ` · réf. <code>${esc(g.mpn)}</code>` : ''}</p>
+          <div class="rv-lines">${g.lines.map((i) => releveLine(i)).join('')}</div>
+        </div>`).join('')}`;
+  }
+
+  function releveCount(p) {
+    return `<strong>${p.saisis}</strong> prix saisis${p.rupture ? `, ${p.rupture} en rupture` : ''} · <strong>${p.restants}</strong> à faire${p.erreur ? ` · <strong class="warn-text">${p.erreur} erreur${p.erreur > 1 ? 's' : ''}</strong>` : ''}${p.attention ? ` · ${p.attention} à vérifier` : ''}`;
+  }
+
+  function releveLine(i) {
+    const R = window.HunterReleve;
+    const r = RV.rows[i];
+    const st = R.checkRow(r);
+    const f = (k, label, ph, cls = '') => `<label class="rv-f ${cls}"><span>${label}</span><input ${k === 'url' || k === 'delai' ? '' : 'inputmode="decimal"'} value="${esc(r[k] || '')}" placeholder="${esc(ph)}" data-rv-i="${i}" data-rv-k="${k}"></label>`;
+    const link = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    return `
+      <div class="rv-line rv-${st.level}" data-rv-line="${i}">
+        <div class="rv-merchant">
+          <strong>${esc(r.marchand)}</strong>
+          <span class="xsmall">${r.url ? link(r.url, 'Ouvrir la page') + ' · ' : ''}${link(R.searchUrl(r.marchand, r.ean), 'Chercher l’EAN')}${r.mpn ? ' · ' + link(R.searchUrl(r.marchand, r.mpn), 'la réf.') : ''}</span>
+        </div>
+        ${f('prix', 'Prix €', '89,99')}
+        ${f('livraison', 'Livraison €', '0 si offerte')}
+        ${f('prix_barre', 'Prix barré €', 'si affiché')}
+        <label class="rv-f"><span>Disponibilité</span><select data-rv-i="${i}" data-rv-k="disponibilite"><option value=""></option>${R.STOCK.map((s) => `<option${s === r.disponibilite ? ' selected' : ''}>${esc(s)}</option>`).join('')}${r.disponibilite && !R.STOCK.includes(r.disponibilite) ? `<option selected>${esc(r.disponibilite)}</option>` : ''}</select></label>
+        ${f('delai', 'Délai', '2-3 jours')}
+        ${f('url', 'Adresse de la page', 'https://…', 'rv-url')}
+        <p class="rv-status xsmall" data-rv-status="${i}">${releveStatus(st)}</p>
+      </div>`;
+  }
+
+  function releveStatus(st) {
+    if (st.level === 'ok') return '✓ complet';
+    if (st.level === 'vide') return st.messages[0] ? esc(st.messages[0]) : '';
+    return (st.level === 'erreur' ? '✗ ' : '⚠ ') + st.messages.map(esc).join(' · ');
+  }
+
+  function releveMsg(text, warn) {
+    const el = document.querySelector('[data-rv-msg]');
+    if (el) { el.textContent = text; el.classList.toggle('warn-text', !!warn); }
+  }
+
+  function releveSave() {
+    RV.savedAt = new Date().toISOString();
+    if (!lsSet(RV_KEY, RV)) releveMsg('Ce navigateur refuse l’enregistrement local : téléchargez la feuille avant de fermer la page.', true);
+    lsSet(RV_URLS, window.HunterReleve.rememberUrls(RV.rows, lsGet(RV_URLS, {})));
+  }
+
+  function releveOpen(name, text) {
+    const R = window.HunterReleve;
+    const res = R.parse(text);
+    const box = document.getElementById('rv-box');
+    if (res.error) { if (box) box.innerHTML = releveEmpty(res.error); return; }
+    RV = { name, header: res.header, rows: R.applyUrls(res.rows, lsGet(RV_URLS, {})) };
+    releveSave();
+    if (box) box.innerHTML = releveBody();
+  }
+
+  function releveRefresh() {
+    const p = window.HunterReleve.progress(RV.rows);
+    const c = document.querySelector('[data-rv-count]');
+    if (c) c.innerHTML = releveCount(p);
+    const bar = document.querySelector('.rv-progress span');
+    if (bar) bar.style.width = rvPct(p) + '%';
+  }
+
+  function releveFilter(mode) {
+    const R = window.HunterReleve;
+    document.querySelectorAll('[data-rv-line]').forEach((el) => {
+      const r = RV.rows[+el.dataset.rvLine];
+      const lvl = R.checkRow(r).level;
+      el.hidden = mode === 'todo' ? !(lvl === 'vide' && !/rupture/i.test(r.disponibilite || ''))
+        : mode === 'pb' ? !['erreur', 'attention'].includes(lvl) : false;
+    });
+    document.querySelectorAll('.rv-product').forEach((card) => { card.hidden = ![...card.querySelectorAll('[data-rv-line]')].some((l) => !l.hidden); });
+  }
+
+  async function loadReleve() {
+    const box = document.getElementById('rv-box');
+    if (!box) return;
+    let res = null;
+    try { res = await fetch('api/releve', { cache: 'no-store' }); } catch (e) { /* hors ligne ou site publié */ }
+    if (!document.body.contains(box)) return;
+    const name = res && res.ok ? res.headers.get('X-Releve-Nom') : null;
+    rvApi = !!name;
+    if (!name) return;
+    const text = await res.text();
+    if (!RV) return releveOpen(name, text);
+    const save = box.querySelector('[data-rv-save]');
+    if (save) save.textContent = 'Enregistrer dans le projet';
+    const dl = box.querySelector('[data-rv-download]');
+    if (dl) dl.hidden = false;
+    // feuille plus récente : on y passe directement si l'ancienne n'a aucune saisie
+    if (RV.name !== name && name > RV.name && !window.HunterReleve.progress(RV.rows).saisis) return releveOpen(name, text);
+    if (RV.name !== name && name > RV.name) releveMsg(`Une feuille plus récente existe : ${name}. Enregistrez celle-ci, puis fermez-la pour ouvrir la nouvelle.`, true);
+  }
+
+  function releveDownload() {
+    const blob = new Blob([window.HunterReleve.serialize(RV.header, RV.rows)], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = RV.name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    releveMsg(`Fichier ${RV.name} téléchargé : placez-le dans data/demarrage/releves/ (il remplace la feuille vide).`);
+  }
+
+  async function releveStore() {
+    const p = window.HunterReleve.progress(RV.rows);
+    if (p.erreur && !confirm(`${p.erreur} ligne(s) en erreur seront ignorées à la conversion. Enregistrer quand même ?`)) return;
+    if (!rvApi) return releveDownload();
+    try {
+      const res = await fetch('api/releve/' + encodeURIComponent(RV.name), { method: 'PUT', headers: { 'X-Hunter': 'releve', 'Content-Type': 'text/csv; charset=utf-8' }, body: window.HunterReleve.serialize(RV.header, RV.rows) });
+      if (!res.ok) throw new Error(await res.text());
+      const j = await res.json();
+      releveMsg(`✓ Enregistré dans ${j.fichier} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.`);
+    } catch (err) {
+      releveMsg(`Enregistrement impossible (${err.message}). Téléchargez la feuille à la place.`, true);
+    }
+  }
+
+  document.addEventListener('input', (e) => {
+    const el = e.target.closest && e.target.closest('[data-rv-i]');
+    if (!el || !RV) return;
+    const i = +el.dataset.rvI;
+    RV.rows[i][el.dataset.rvK] = el.value.trim();
+    releveSave();
+    const st = window.HunterReleve.checkRow(RV.rows[i]);
+    const line = document.querySelector(`[data-rv-line="${i}"]`);
+    if (line) line.className = `rv-line rv-${st.level}`;
+    const s = document.querySelector(`[data-rv-status="${i}"]`);
+    if (s) s.innerHTML = releveStatus(st);
+    releveRefresh();
+  });
+
+  document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-rv-file]')) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => releveOpen(file.name, String(reader.result));
+      reader.readAsText(file, 'utf-8');
+    } else if (e.target.matches('[data-rv-hour]') && RV) {
+      RV.rows = window.HunterReleve.setHour(RV.rows, e.target.value);
+      releveSave();
+      releveMsg(`Heure du relevé : ${e.target.value}.`);
+    } else if (e.target.matches('[data-rv-filter]') && RV) releveFilter(e.target.value);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!RV) return;
+    if (e.target.closest('[data-rv-download]')) releveDownload();
+    else if (e.target.closest('[data-rv-save]')) releveStore();
+    else if (e.target.closest('[data-rv-close]')) {
+      if (!confirm('Fermer cette feuille ? Les saisies non enregistrées dans le projet ni téléchargées seront perdues.')) return;
+      try { localStorage.removeItem(RV_KEY); } catch (err) { /* stockage indisponible */ }
+      RV = null;
+      render();
+    }
+  });
+
   /* ---------------- rendu & événements ---------------- */
   function updateNav() {
     const n = S.get().watchlist.length;
@@ -1451,13 +1669,15 @@
       case 'oeil': html = viewGlance(parts[1]); break;
       case 'scan': html = viewScan(params); break;
       case 'qualite': html = viewQuality(); break;
+      case 'releve': html = viewReleve(); break;
       default: html = viewNotFound();
     }
     $app.innerHTML = html;
     if (parts[0] === 'qualite') loadCollecte();
+    if (parts[0] === 'releve') loadReleve();
     bindChart($app);
     updateNav();
-    const titles = { recherche: 'Recherche', produit: (byId(parts[1]) || {}).name, surveillance: 'Surveillance', compte: 'Compte', methodologie: 'Méthodologie', legal: 'Mentions légales', comparer: 'Comparer', labo: 'Labo', verificateur: checkerTitle().title, verifier: 'Vérifier une remise', scan: 'Scanner', qualite: 'Qualité des données', oeil: 'Coup d’œil' + ((byId(parts[1]) || {}).name ? ' · ' + byId(parts[1]).name : '') };
+    const titles = { recherche: 'Recherche', produit: (byId(parts[1]) || {}).name, surveillance: 'Surveillance', compte: 'Compte', methodologie: 'Méthodologie', legal: 'Mentions légales', comparer: 'Comparer', labo: 'Labo', verificateur: checkerTitle().title, verifier: 'Vérifier une remise', scan: 'Scanner', qualite: 'Qualité des données', releve: 'Saisie du relevé', oeil: 'Coup d’œil' + ((byId(parts[1]) || {}).name ? ' · ' + byId(parts[1]).name : '') };
     document.title = (titles[parts[0]] ? titles[parts[0]] + ' · ' : '') + 'The Hunter';
   }
 
@@ -1600,7 +1820,7 @@
     } else if (sampleState === 'invalid') {
       toggle = '<span class="ds-warn">Échantillon présent mais invalide : lancez tools/validate-dataset.js</span>';
     }
-    bar.innerHTML = `<span>Prototype v0.19 — ${label}</span>${toggle}`;
+    bar.innerHTML = `<span>Prototype v0.20 — ${label}</span>${toggle}`;
     bar.classList.toggle('is-sample', meta.kind !== 'demo');
   }
 
