@@ -1457,7 +1457,7 @@
 
   function releveBody() {
     const R = window.HunterReleve;
-    const p = R.progress(RV.rows);
+    const p = R.progress(RV.rows, RV.prev);
     const hour = (String((RV.rows[0] && RV.rows[0].date_collecte) || '').match(/\d{1,2}:\d{2}/) || ['10:00'])[0];
     const groups = R.group(RV.rows);
     return `
@@ -1468,10 +1468,12 @@
         </div>
         <div class="rv-progress" aria-hidden="true"><span style="width:${rvPct(p)}%"></span></div>
         <p class="small" data-rv-count>${releveCount(p)}</p>
+        ${RV.prevName ? `<p class="muted xsmall">Comparé au relevé précédent : ${esc(RV.prevName)} (${Object.keys(RV.prev || {}).length} prix). Écart de plus de ${Math.round(window.HunterReleve.JUMP * 100)} % signalé.</p>` : ''}
         <div class="rv-actions">
           <select data-rv-filter aria-label="Lignes affichées"><option value="">Toutes les lignes</option><option value="todo">À faire</option><option value="pb">Erreurs et avertissements</option></select>
           <button class="btn btn-primary btn-sm" data-rv-save>${rvApi ? 'Enregistrer dans le projet' : 'Télécharger la feuille remplie'}</button>
           <button class="btn btn-ghost btn-sm" data-rv-download ${rvApi ? '' : 'hidden'}>Télécharger</button>
+          ${RV.prev && Object.keys(RV.prev).length ? '<button class="btn btn-ghost btn-sm" data-rv-carry title="Seulement sur les lignes où ils sont vides">Reprendre livraison et délai précédents</button>' : ''}
           <button class="btn btn-ghost btn-sm" data-rv-close>Fermer la feuille</button>
         </div>
         <p class="small" data-rv-msg role="status"></p>
@@ -1491,13 +1493,14 @@
   function releveLine(i) {
     const R = window.HunterReleve;
     const r = RV.rows[i];
-    const st = R.checkRow(r);
+    const st = R.checkRow(r, RV.prev);
     const f = (k, label, ph, cls = '') => `<label class="rv-f ${cls}"><span>${label}</span><input ${k === 'url' || k === 'delai' ? '' : 'inputmode="decimal"'} value="${esc(r[k] || '')}" placeholder="${esc(ph)}" data-rv-i="${i}" data-rv-k="${k}"></label>`;
     const link = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
     return `
       <div class="rv-line rv-${st.level}" data-rv-line="${i}">
         <div class="rv-merchant">
           <strong>${esc(r.marchand)}</strong>
+          ${relevePrevHint(r)}
           <span class="xsmall">${r.url ? link(r.url, 'Ouvrir la page') + ' · ' : ''}${link(R.searchUrl(r.marchand, r.ean), 'Chercher l’EAN')}${r.mpn ? ' · ' + link(R.searchUrl(r.marchand, r.mpn), 'la réf.') : ''}</span>
         </div>
         ${f('prix', 'Prix €', '89,99')}
@@ -1508,6 +1511,43 @@
         ${f('url', 'Adresse de la page', 'https://…', 'rv-url')}
         <p class="rv-status xsmall" data-rv-status="${i}">${releveStatus(st)}</p>
       </div>`;
+  }
+
+  function relevePrevHint(r) {
+    const R = window.HunterReleve;
+    const p = RV.prev && RV.prev[R.key(r)];
+    if (!p) return '';
+    const bits = [`${esc(p.prix)} €`];
+    if (p.livraison !== '') bits.push(p.livraison === '0' ? 'livr. offerte' : `livr. ${esc(p.livraison)} €`);
+    if (p.prix_barre) bits.push(`barré ${esc(p.prix_barre)} €`);
+    if (p.disponibilite) bits.push(esc(p.disponibilite));
+    return `<span class="xsmall muted rv-prev">Précédent : ${bits.join(' · ')}</span>`;
+  }
+
+  /* Charge la feuille précédente (serveur local) pour comparer les saisies */
+  async function releveLoadPrevious() {
+    if (!rvApi || !RV) return;
+    const R = window.HunterReleve;
+    try {
+      const names = await (await fetch('api/releves', { cache: 'no-store' })).json();
+      // remonte jusqu'à la dernière feuille qui contient des prix (une journée manquée laisse une feuille vide)
+      let prev = null;
+      let prevName = null;
+      for (const n of names.filter((x) => x < RV.name).sort().reverse().slice(0, 7)) {
+        const res = await fetch('api/releve/' + encodeURIComponent(n), { cache: 'no-store' });
+        if (!res.ok) continue;
+        const parsed = R.parse(await res.text());
+        if (parsed.error) continue;
+        const idx = R.previousIndex(parsed.rows);
+        if (Object.keys(idx).length) { prev = idx; prevName = n; break; }
+      }
+      if (!prev) return;
+      RV.prev = prev;
+      RV.prevName = prevName;
+      releveSave();
+      const box = document.getElementById('rv-box');
+      if (box) box.innerHTML = releveBody();
+    } catch (e) { /* comparaison facultative */ }
   }
 
   function releveStatus(st) {
@@ -1538,7 +1578,7 @@
   }
 
   function releveRefresh() {
-    const p = window.HunterReleve.progress(RV.rows);
+    const p = window.HunterReleve.progress(RV.rows, RV.prev);
     const c = document.querySelector('[data-rv-count]');
     if (c) c.innerHTML = releveCount(p);
     const bar = document.querySelector('.rv-progress span');
@@ -1549,7 +1589,7 @@
     const R = window.HunterReleve;
     document.querySelectorAll('[data-rv-line]').forEach((el) => {
       const r = RV.rows[+el.dataset.rvLine];
-      const lvl = R.checkRow(r).level;
+      const lvl = R.checkRow(r, RV.prev).level;
       el.hidden = mode === 'todo' ? !(lvl === 'vide' && !/rupture/i.test(r.disponibilite || ''))
         : mode === 'pb' ? !['erreur', 'attention'].includes(lvl) : false;
     });
@@ -1566,14 +1606,15 @@
     rvApi = !!name;
     if (!name) return;
     const text = await res.text();
-    if (!RV) return releveOpen(name, text);
+    if (!RV) { releveOpen(name, text); return releveLoadPrevious(); }
     const save = box.querySelector('[data-rv-save]');
     if (save) save.textContent = 'Enregistrer dans le projet';
     const dl = box.querySelector('[data-rv-download]');
     if (dl) dl.hidden = false;
     // feuille plus récente : on y passe directement si l'ancienne n'a aucune saisie
-    if (RV.name !== name && name > RV.name && !window.HunterReleve.progress(RV.rows).saisis) return releveOpen(name, text);
+    if (RV.name !== name && name > RV.name && !window.HunterReleve.progress(RV.rows, RV.prev).saisis) { releveOpen(name, text); return releveLoadPrevious(); }
     if (RV.name !== name && name > RV.name) releveMsg(`Une feuille plus récente existe : ${name}. Enregistrez celle-ci, puis fermez-la pour ouvrir la nouvelle.`, true);
+    releveLoadPrevious();
   }
 
   function releveDownload() {
@@ -1588,7 +1629,7 @@
   }
 
   async function releveStore() {
-    const p = window.HunterReleve.progress(RV.rows);
+    const p = window.HunterReleve.progress(RV.rows, RV.prev);
     if (p.erreur && !confirm(`${p.erreur} ligne(s) en erreur seront ignorées à la conversion. Enregistrer quand même ?`)) return;
     if (!rvApi) return releveDownload();
     try {
@@ -1607,7 +1648,7 @@
     const i = +el.dataset.rvI;
     RV.rows[i][el.dataset.rvK] = el.value.trim();
     releveSave();
-    const st = window.HunterReleve.checkRow(RV.rows[i]);
+    const st = window.HunterReleve.checkRow(RV.rows[i], RV.prev);
     const line = document.querySelector(`[data-rv-line="${i}"]`);
     if (line) line.className = `rv-line rv-${st.level}`;
     const s = document.querySelector(`[data-rv-status="${i}"]`);
@@ -1631,6 +1672,15 @@
 
   document.addEventListener('click', (e) => {
     if (!RV) return;
+    if (e.target.closest('[data-rv-carry]')) {
+      const out = window.HunterReleve.carryOver(RV.rows, RV.prev);
+      RV.rows = out.rows;
+      releveSave();
+      const box = document.getElementById('rv-box');
+      if (box) box.innerHTML = releveBody();
+      releveMsg(out.n ? `${out.n} case(s) reprise(s) du relevé précédent : vérifiez-les en passant sur chaque page.` : 'Rien à reprendre : livraison et délai déjà remplis.');
+      return;
+    }
     if (e.target.closest('[data-rv-download]')) releveDownload();
     else if (e.target.closest('[data-rv-save]')) releveStore();
     else if (e.target.closest('[data-rv-close]')) {
@@ -1820,7 +1870,7 @@
     } else if (sampleState === 'invalid') {
       toggle = '<span class="ds-warn">Échantillon présent mais invalide : lancez tools/validate-dataset.js</span>';
     }
-    bar.innerHTML = `<span>Prototype v0.20 — ${label}</span>${toggle}`;
+    bar.innerHTML = `<span>Prototype v0.21 — ${label}</span>${toggle}`;
     bar.classList.toggle('is-sample', meta.kind !== 'demo');
   }
 

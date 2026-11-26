@@ -647,3 +647,4 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0;
   .rv-bar { position: static; }
 }
 .rv-actions select { width: auto; flex: 0 1 auto; }
+.rv-prev { display: block; }

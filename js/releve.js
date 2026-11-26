@@ -65,8 +65,45 @@
 
   /* ---------- contrôles ---------- */
   const num = (v) => { const s = String(v || '').replace(/[€\s ]/g, '').replace(',', '.'); return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN; };
+  /* Écart (en part) au-delà duquel un prix est signalé par rapport au relevé précédent */
+  const JUMP = 0.35;
+
+  /* Relevé précédent : clé EAN|marchand → { prix, livraison, prix_barre, disponibilite, delai } (lignes avec un prix) */
+  function previousIndex(rows) {
+    const m = {};
+    (rows || []).forEach((r) => { if (num(r.prix) > 0) m[key(r)] = { prix: r.prix, livraison: r.livraison || '', prix_barre: r.prix_barre || '', disponibilite: r.disponibilite || '', delai: r.delai || '' }; });
+    return m;
+  }
+
+  /* Feuille précédente : la plus récente avant celle ouverte */
+  function previousName(names, current) {
+    return (names || []).filter((n) => n < current).sort().pop() || null;
+  }
+
+  /* Reprend livraison et délai du relevé précédent sur les lignes où ils sont vides ; renvoie { rows, n } */
+  function carryOver(rows, prev) {
+    let n = 0;
+    const out = rows.map((r) => {
+      const p = prev && prev[key(r)];
+      if (!p) return r;
+      const next = { ...r };
+      if (!String(r.livraison || '').trim() && p.livraison !== '') { next.livraison = p.livraison; n++; }
+      if (!String(r.delai || '').trim() && p.delai) { next.delai = p.delai; n++; }
+      return next;
+    });
+    return { rows: out, n };
+  }
+
+  /* Variation par rapport au relevé précédent, en part (0,2 = +20 %) ; null si pas de point de comparaison */
+  function change(r, prev) {
+    const p = prev && prev[key(r)];
+    const a = num(r.prix);
+    const b = p ? num(p.prix) : NaN;
+    return a > 0 && b > 0 ? a / b - 1 : null;
+  }
+
   /* Retourne { level: 'ok'|'vide'|'erreur'|'attention', messages[] } pour une ligne. */
-  function checkRow(r) {
+  function checkRow(r, prev) {
     const msgs = [];
     let level = 'ok';
     const bad = (m) => { msgs.push(m); level = 'erreur'; };
@@ -86,12 +123,17 @@
     if (!String(r.livraison || '').trim()) warn('livraison non notée (laisser vide seulement si elle n’est pas affichée avant la commande)');
     if (!String(r.disponibilite || '').trim()) warn('disponibilité non notée');
     if (String(r.url || '').trim() && !/^https:\/\//i.test(r.url)) warn('adresse de page sans https://');
+    const d = change(r, prev);
+    if (d !== null && Math.abs(d) > JUMP) {
+      const pct = Math.round(d * 100);
+      warn(`${pct > 0 ? '+' : ''}${pct} % par rapport au relevé précédent (${prev[key(r)].prix} €) : vérifiez la saisie`);
+    }
     return { level, messages: msgs };
   }
 
-  function progress(rows) {
+  function progress(rows, prev) {
     const c = { total: rows.length, ok: 0, attention: 0, erreur: 0, vide: 0, rupture: 0 };
-    rows.forEach((r) => { const k = checkRow(r); c[k.level]++; if (k.level === 'vide' && /rupture/i.test(r.disponibilite || '')) c.rupture++; });
+    rows.forEach((r) => { const k = checkRow(r, prev); c[k.level]++; if (k.level === 'vide' && /rupture/i.test(r.disponibilite || '')) c.rupture++; });
     c.saisis = c.ok + c.attention + c.erreur;
     c.restants = c.vide - c.rupture;
     return c;
@@ -130,5 +172,5 @@
     return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
   }
 
-  return { EDITABLE, STOCK, searchUrl, parse, serialize, checkRow, progress, setHour, applyUrls, rememberUrls, group, fileDate, key };
+  return { EDITABLE, STOCK, JUMP, searchUrl, parse, serialize, checkRow, progress, setHour, applyUrls, rememberUrls, group, fileDate, key, previousIndex, previousName, carryOver, change };
 });

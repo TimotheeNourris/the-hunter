@@ -8,7 +8,7 @@
    - rien d'autre n'est intercepté (aucune requête vers des tiers).
    Changer CACHE à chaque version pour purger les anciennes copies.
    ========================================================================= */
-const CACHE = 'thehunter-v0.20.0';
+const CACHE = 'thehunter-v0.21.0';
 const SHELL = [
   './',
   './index.html',
